@@ -4,6 +4,21 @@
 
 constexpr std::array<unsigned char, SHA_DIGEST_LENGTH>	NullHash = {};
 
+std::bitset<NUM_FAILURES>	expectedFailures(std::initializer_list<FailureDimensions>	dims)
+{
+	std::bitset<NUM_FAILURES>	bits;
+	for (auto dim : dims)
+	{
+		bits.set(static_cast<size_t>(dim));
+	}
+	return bits;
+};
+
+void blockCorruptionHook(Block &new_Block)
+{
+	std::fill(std::begin(new_Block.previous_hash), std::end(new_Block.previous_hash), 0xFF);
+};
+
 std::bitset<NUM_FAILURES>	isBlockchainValid(const Blockchain&	blockchain)
 {
 	std::bitset<NUM_FAILURES>	failureFlags;

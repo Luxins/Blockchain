@@ -16,3 +16,5 @@ enum class	FailureDimensions : std::size_t
 static constexpr size_t	NUM_FAILURES = static_cast<size_t>(FailureDimensions::COUNT);
 
 std::bitset<NUM_FAILURES>	isBlockchainValid(const Blockchain&	blockchain);
+std::bitset<NUM_FAILURES>	expectedFailures(std::initializer_list<FailureDimensions>	dims);
+void blockCorruptionHook(Block &new_Block);
