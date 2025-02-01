@@ -1,0 +1,14 @@
+# Ignore build artifacts
+.vscode/
+**/CMakeFiles/
+build/
+*.o
+*.obj
+*.pdb
+*.lib
+*.a
+*.so
+*.dll
+*.dSYM
+Block.dSYM/
+./tests/tFailureCollection
