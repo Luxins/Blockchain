@@ -1,3 +1,4 @@
+// System headers:
 #include <map>
 #include <algorithm>
 #include <functional>
@@ -5,19 +6,36 @@
 #include <optional>
 #include <sstream>
 #include <array>
-#include <openssl/sha.h>
 #include <vector>
 #include <string>
-#include <string.h>
+#include <cstring>
 #include <chrono>
 #include <ctime>
 #include <iostream>
 #include <bitset>
+#include <ostream>
+#include <iomanip>
 
-std::array<char, SHA_DIGEST_LENGTH>	NullHash;
-#define NULL_HASH_INIT(HASH_ARR)	std::fill(std::begin(HASH_ARR), std::end(HASH_ARR), 0x00)
+// Third party headers:
+#include <openssl/sha.h>
 
-enum	FailureDimensions : std::size_t
+std::array<unsigned char, SHA_DIGEST_LENGTH>	NullHash;
+inline void	init_hash(std::array<unsigned char, SHA_DIGEST_LENGTH>	&hashArr)
+{
+	std::fill(std::begin(hashArr), std::end(hashArr), 0x00);
+}
+
+std::ostream&	operator<<(std::ostream& os, const std::array<unsigned char, SHA_DIGEST_LENGTH> arr)
+{
+	os << std::hex << std::setfill('0');
+	for (auto byte : arr)
+	{
+		os << std::setw(2) << static_cast<int>(byte);
+	}
+	return os;
+};
+
+enum class	FailureDimensions : std::size_t
 {
     CorruptedGenesis,
     CorruptedLink,
@@ -47,8 +65,8 @@ struct	Block {
 	}
 	long long	timestamp;
 	std::string	data;
-	unsigned char	current_hash[SHA_DIGEST_LENGTH];
-	unsigned char	previous_hash[SHA_DIGEST_LENGTH];
+	std::array<unsigned char, SHA_DIGEST_LENGTH>	current_hash;
+	std::array<unsigned char, SHA_DIGEST_LENGTH>	previous_hash;
 };
 
 struct	Blockchain {
@@ -60,15 +78,15 @@ struct	Blockchain {
 	void	addBlock(Block &new_Block) {
 		// Copy over the hashes to the new block and compute the blocks own hash
 		if (primitive.empty())
-			NULL_HASH_INIT(new_Block.previous_hash);
+			init_hash(new_Block.previous_hash);
 		else
-			memcpy(new_Block.previous_hash, primitive.back().current_hash, sizeof(new_Block.previous_hash));
+			std::copy(std::begin(primitive.back().current_hash), std::end(primitive.back().current_hash), std::begin(new_Block.previous_hash));
 		
 		// Copy the hashable content of the block into a new memory location and then hash it
 		std::stringstream	serialised_hashable_content_stream;
 		serialised_hashable_content_stream << "|" << new_Block.data << "|" << new_Block.Index << "|" << new_Block.previous_hash << "|" << new_Block.timestamp;
 		std::string serialised_hashable_content = serialised_hashable_content_stream.str();
-		SHA1(reinterpret_cast<const u_int8_t *>(serialised_hashable_content.c_str()), sizeof(Block) - sizeof(Block::current_hash), new_Block.current_hash);
+		SHA1(reinterpret_cast<const u_int8_t *>(serialised_hashable_content.c_str()), sizeof(Block) - sizeof(Block::current_hash), std::begin(new_Block.current_hash));
 		if (postAddBlockHook)
 		{
 			postAddBlockHook(new_Block);
@@ -77,16 +95,16 @@ struct	Blockchain {
 	}
 };
 
-std::bitset<NUM_FAILURES>	isBlockchainValid(Blockchain blockchain)
+std::bitset<NUM_FAILURES>	isBlockchainValid(const Blockchain&	blockchain)
 {
 	std::bitset<NUM_FAILURES>	failureFlags;
 
-	std::optional<std::array<char, SHA_DIGEST_LENGTH>>	hashPreviousBlock;
-	for (Block& block : blockchain.primitive)
+	std::optional<std::array<unsigned char, SHA_DIGEST_LENGTH>>	hashPreviousBlock;
+	for (const Block& block : blockchain.primitive)
 	{
-		std::array<char, SHA_DIGEST_LENGTH>	currentHash;
+		std::array<unsigned char, SHA_DIGEST_LENGTH>	currentHash;
 		std::copy(std::begin(block.current_hash), std::end(block.current_hash), currentHash.begin());
-		std::array<char, SHA_DIGEST_LENGTH>	backrefHashCurrentBlock;
+		std::array<unsigned char, SHA_DIGEST_LENGTH>	backrefHashCurrentBlock;
 		std::copy(std::begin(block.previous_hash), std::end(block.previous_hash), backrefHashCurrentBlock.begin());
 		if (!hashPreviousBlock)
 		{
@@ -120,7 +138,7 @@ void	runTestCase(RETURN_TYPE expectation, CALLABLE &&test, ARGS&&... args)
 int main(void)
 {
 	// Initialise the NullHashGlobal
-	NULL_HASH_INIT(NullHash);
+	init_hash(NullHash);
 
 	auto testCaseRunner = runTestCase<decltype(isBlockchainValid), Blockchain&>;
 	Blockchain	chain = Blockchain();
@@ -141,15 +159,15 @@ int main(void)
 	Blockchain corrupted_chain = Blockchain();
 	corrupted_chain.postAddBlockHook = [](Block &new_Block)
 	{
-		memset(new_Block.previous_hash, 0xFF, SHA_DIGEST_LENGTH);
+		std::fill(std::begin(new_Block.previous_hash), std::end(new_Block.previous_hash), 0xFF);
 	};
 
 	corrupted_chain.addBlock(current);
-	testCaseRunner(std::bitset<NUM_FAILURES>().set(FailureDimensions::CorruptedGenesis), isBlockchainValid, corrupted_chain);
+	testCaseRunner(std::bitset<NUM_FAILURES>().set(static_cast<std::size_t>(FailureDimensions::CorruptedGenesis)), isBlockchainValid, corrupted_chain);
 
 	// Test case 3: two blocks, but both hashes are initalised to 0xFF...
 	corrupted_chain.addBlock(current1);
-	testCaseRunner(std::bitset<NUM_FAILURES>().set(FailureDimensions::CorruptedGenesis).set(FailureDimensions::CorruptedLink), isBlockchainValid, corrupted_chain);
+	testCaseRunner(std::bitset<NUM_FAILURES>().set(static_cast<std::size_t>(FailureDimensions::CorruptedGenesis)).set(static_cast<std::size_t>(FailureDimensions::CorruptedLink)), isBlockchainValid, corrupted_chain);
 
 	return 0;
 }
