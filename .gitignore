@@ -11,4 +11,4 @@ build/
 *.dll
 *.dSYM
 Block.dSYM/
-./tests/tFailureCollection
+tests/tFailureCollection
