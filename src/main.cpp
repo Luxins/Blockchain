@@ -25,8 +25,9 @@ inline void	init_hash(std::array<unsigned char, SHA_DIGEST_LENGTH>	&hashArr)
 	std::fill(std::begin(hashArr), std::end(hashArr), 0x00);
 }
 
-std::ostream&	operator<<(std::ostream& os, const std::array<unsigned char, SHA_DIGEST_LENGTH> arr)
+std::ostream&	operator<<(std::ostream& os, const std::array<unsigned char, SHA_DIGEST_LENGTH>& arr)
 {
+	// Converting arr to hex
 	os << std::hex << std::setfill('0');
 	for (auto byte : arr)
 	{
@@ -57,16 +58,33 @@ struct	Block {
 		timestamp = Block::getCurrentTimestamp();
 		Index = -1;
 	}
-	int	Index;
 	static long long getCurrentTimestamp() {
 		std::chrono::system_clock::time_point point = std::chrono::system_clock::now();
 		std::chrono::microseconds microsenconds_since_epoch = std::chrono::duration_cast<std::chrono::microseconds>(point.time_since_epoch());
 		return microsenconds_since_epoch.count();
 	}
-	long long	timestamp;
 	std::string	data;
+	int	Index;
 	std::array<unsigned char, SHA_DIGEST_LENGTH>	current_hash;
 	std::array<unsigned char, SHA_DIGEST_LENGTH>	previous_hash;
+	long long	timestamp;
+
+	// Helpers
+	static std::string serialize(const Block&	block)
+	{
+		std::stringstream	ss;
+		ss	<< "|" << block.data
+			<< "|" << block.Index
+			<< "|" << block.previous_hash
+			<< "|" << block.timestamp;
+		return ss.str();
+	}
+
+	static void	computeHash(const std::string& data, std::array<unsigned char, SHA_DIGEST_LENGTH>&	dest)
+	{
+		SHA1(reinterpret_cast<const unsigned char *>(data.c_str()), data.size(),
+			std::begin(dest));
+	}
 };
 
 struct	Blockchain {
@@ -83,10 +101,8 @@ struct	Blockchain {
 			std::copy(std::begin(primitive.back().current_hash), std::end(primitive.back().current_hash), std::begin(new_Block.previous_hash));
 		
 		// Copy the hashable content of the block into a new memory location and then hash it
-		std::stringstream	serialised_hashable_content_stream;
-		serialised_hashable_content_stream << "|" << new_Block.data << "|" << new_Block.Index << "|" << new_Block.previous_hash << "|" << new_Block.timestamp;
-		std::string serialised_hashable_content = serialised_hashable_content_stream.str();
-		SHA1(reinterpret_cast<const u_int8_t *>(serialised_hashable_content.c_str()), sizeof(Block) - sizeof(Block::current_hash), std::begin(new_Block.current_hash));
+		const std::string serialized_content = Block::serialize(new_Block);
+		Block::computeHash(serialized_content, new_Block.current_hash);
 		if (postAddBlockHook)
 		{
 			postAddBlockHook(new_Block);
