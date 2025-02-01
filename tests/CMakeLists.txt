@@ -1,3 +1,4 @@
-# add_executable(tFailureCollection FailureCollection.cpp)
+add_executable(tests
+	main.cpp)
 
-# target_link_libraries(tFailureCollection PRIVATE DataStructures)
+target_link_libraries(tests PRIVATE BlockchainLib)

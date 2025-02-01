@@ -1,3 +1,4 @@
+#pragma once
 // System headers:
 #include <functional>
 #include <vector>

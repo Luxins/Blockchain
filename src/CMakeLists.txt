@@ -1,6 +1,7 @@
 # Defining the library
 add_library(BlockchainLib
 	Block.cpp
+	Blockchain.cpp
 )
 
 # public interface for headers
